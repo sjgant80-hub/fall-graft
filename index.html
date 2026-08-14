@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fall-graft · put a block in a page without cutting it in half</title>
+<meta name="description" content="Fourteen live apps drew their whole interface and ran no JavaScript, because an injector wrote its block inside the host script. Paste a page and find out.">
+<style>
+:root{
+  --ink:#17181c; --dim:#5d6069; --faint:#8b8f99;
+  --paper:#faf9f6; --card:#ffffff; --line:#e4e2dc; --rule:#cfccc4;
+  --cut:#b4342b; --cut-bg:#fdf1ef; --safe:#146b4d; --safe-bg:#eef7f2;
+  --mark:#9a6b12; --mark-bg:#fdf6e8;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --ink:#e6e4de; --dim:#a3a49c; --faint:#75776f;
+  --paper:#121316; --card:#1a1b1f; --line:#2c2d33; --rule:#3a3b42;
+  --cut:#f08a7e; --cut-bg:#2a1715; --safe:#6dd3a6; --safe-bg:#0f2119;
+  --mark:#e2b45c; --mark-bg:#241d0f;
+}}
+:root[data-theme=dark]{
+  --ink:#e6e4de; --dim:#a3a49c; --faint:#75776f;
+  --paper:#121316; --card:#1a1b1f; --line:#2c2d33; --rule:#3a3b42;
+  --cut:#f08a7e; --cut-bg:#2a1715; --safe:#6dd3a6; --safe-bg:#0f2119;
+  --mark:#e2b45c; --mark-bg:#241d0f;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:16px/1.65 ui-serif,Georgia,'Times New Roman',serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:74ch;margin:0 auto;padding:clamp(28px,5vw,64px) clamp(18px,4vw,28px) 80px}
+header{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:30px}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 10px}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.12;margin:0 0 12px;text-wrap:balance;letter-spacing:-.015em}
+.sub{color:var(--dim);margin:0;font-size:17px}
+h2{font-size:19px;margin:38px 0 12px;letter-spacing:-.01em}
+p{margin:0 0 14px}
+code,pre{font-family:var(--mono);font-size:13px}
+pre{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--rule);
+  padding:14px 16px;overflow-x:auto;margin:0 0 16px;line-height:1.55;border-radius:0 4px 4px 0}
+.cutline{background:var(--cut-bg);color:var(--cut);display:block;margin:0 -16px;padding:0 16px}
+.tool{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px;margin:14px 0 26px}
+label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:8px}
+textarea{width:100%;min-height:170px;resize:vertical;background:var(--paper);color:var(--ink);
+  border:1px solid var(--line);border-radius:5px;padding:11px;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+textarea:focus-visible,button:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+button{font:600 14px/1 ui-sans-serif,system-ui,sans-serif;padding:10px 16px;border-radius:5px;
+  border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:hover{opacity:.86}
+#out{margin-top:16px}
+.verdict{border-radius:6px;padding:13px 15px;margin-bottom:12px;border:1px solid}
+.verdict.cut{background:var(--cut-bg);border-color:var(--cut);color:var(--cut)}
+.verdict.safe{background:var(--safe-bg);border-color:var(--safe);color:var(--safe)}
+.verdict.warn{background:var(--mark-bg);border-color:var(--mark);color:var(--mark)}
+.verdict b{display:block;font-size:16px;margin-bottom:3px}
+.verdict span{color:var(--ink);font-size:14.5px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+td.n{font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+.scroll{overflow-x:auto}
+.note{font-size:14.5px;color:var(--dim);border-left:2px solid var(--rule);padding-left:14px;margin:0 0 16px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--faint);font-family:var(--mono)}
+a{color:inherit;text-decoration-color:var(--rule);text-underline-offset:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="kicker">fall-graft · mutation-gated</p>
+  <h1>Fourteen live apps drew their whole interface and ran no JavaScript.</h1>
+  <p class="sub">They had been cut in half by the thing that was supposed to add a feature to them.</p>
+</header>
+
+<p>An injector appended its block at a byte offset. On fourteen pages that offset landed <em>inside</em>
+the host <code>&lt;script&gt;</code>, in the middle of a statement:</p>
+
+<pre><code>function report(x) {
+  return `&lt;!doctype html&gt;&lt;html&gt;&lt;body&gt;
+    &lt;p&gt;${x}&lt;/p&gt;
+<span class="cutline">&lt;!-- AUTOPILOT --&gt;                       ← the block, written here
+&lt;script type="module"&gt; … &lt;/script&gt;      ← and the page ends, right here</span>
+  &lt;/body&gt;&lt;/html&gt;`;              ← the host script's own next line
+}</code></pre>
+
+<p><strong>A browser ends a <code>&lt;script&gt;</code> at the first <code>&lt;/script&gt;</code> it
+meets</strong> — inside a string, inside a template literal, it makes no difference. So the host script
+stopped there and everything after it stopped being code: 622 lines in one app. Every page still
+<em>drew</em>, because the static HTML around it was untouched. That is why nobody noticed.</p>
+
+<p class="note">fallaccount-trades shipped with 44 controls, 25 click handlers, and zero functions
+defined. It looked completely normal.</p>
+
+<h2>Paste a page</h2>
+<div class="tool">
+  <label for="src">the HTML of a single-file app</label>
+  <textarea id="src" spellcheck="false" placeholder="paste the whole file, or press Show me a cut page"></textarea>
+  <div class="row">
+    <button id="go">Check it</button>
+    <button class="ghost" id="demo">Show me a cut page</button>
+    <button class="ghost" id="clear">Clear</button>
+  </div>
+  <div id="out"></div>
+</div>
+
+<h2>The rules it follows</h2>
+<p><strong>Never write inside a script.</strong> The insertion point is chosen from the document's
+structure, never from a byte count. An offset knows nothing about what it is landing in the middle of.</p>
+<p><strong>Never write a block twice.</strong> One app carried two, so repairing one left it just as dead.</p>
+<p><strong>Never write a page that does not parse.</strong> The result is compiled before it is
+returned. A graft that would break the page is refused, with the reason, instead of written.</p>
+
+<h2>Using it</h2>
+<pre><code>node inject.mjs check  page.html          # is a block sitting inside a script?
+node inject.mjs add    block.html page.html   # graft it safely, or refuse
+node inject.mjs repair page.html          # move a block that is already inside one</code></pre>
+
+<footer>
+  the checker on this page is the gated kernel itself, inlined · 58 tests · 26/30 mutants killed,
+  4 reviewed-equivalent · <a href="https://github.com/sjgant80-hub/fall-graft">source</a>
+</footer>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// THE GATED KERNEL — inlined verbatim by build-page.mjs from graft.mjs.
+// The checker you just used IS the code the mutation gate ran against.
+// Do not edit between the markers: edit graft.mjs, re-run the gate, rebuild the page.
+// ════════════════════════════════════════════════════════════════
+/* __GRAFT_KERNEL__ */
+// graft.mjs — put a block into a page without cutting the page in half.
+//
+// ⚑ WHY THIS EXISTS. An injector appended its block at a byte offset. On fourteen live apps that
+// offset landed INSIDE the host <script>, in the middle of a statement:
+//
+//     var html='<!DOCTYPE html>...                        ← host script, mid string
+//     <script type="module"> ...the injected block... <\/script>
+//     </body></html>';                                   ← the host script's own next line
+//
+// A browser ends a <script> at the first <\/script> it meets — even inside a string, even inside a
+// template literal. So the host script was severed there and everything after it stopped being code:
+// 622 lines in fallaccount, 546 in fallinsurancepaper. Every page still DREW, because the static HTML
+// around it was untouched, which is why it went unnoticed. fallaccount-trades shipped with 44
+// controls, 25 click handlers and zero functions defined.
+//
+// Three rules, each of them a bug that actually happened:
+//
+//   1 · NEVER WRITE INSIDE A SCRIPT. The insertion point is chosen structurally, not by offset.
+//   2 · NEVER WRITE A BLOCK TWICE. fallaccount carried two, so repairing one left it just as dead.
+//   3 · NEVER WRITE A PAGE THAT DOES NOT PARSE. The result is compiled before it is returned, and a
+//       graft that would break the page is refused with a reason instead of written.
+//
+// Pure: no filesystem, no network. The JavaScript parser is passed in — `new vm.Script` under Node,
+// `new Function` in a browser — the same way the audit chain takes its hash function, so the checker
+// and the writer can never drift apart.
+
+const CLOSE = '</' + 'script>';
+
+/** Script types a browser executes. Anything else on a <script> tag is data. */
+const EXECUTED = /^(|module|text\/javascript|application\/javascript|text\/ecmascript|application\/ecmascript)$/i;
+
+function typeOf(attrs) {
+  const m = /\btype\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs || '');
+  return (m ? (m[2] ?? m[3] ?? m[4]) : '').trim();
+}
+
+/**
+ * Every <script> element, as a BROWSER sees it: the body ends at the first `<\/script>`, whatever the
+ * JavaScript around it thinks. That rule is the whole reason the estate lost fourteen apps.
+ */
+function scriptSpans(html) {
+  const src = typeof html === 'string' ? html : '';
+  const out = [];
+  const re = /<script([^>]*)>/gi;
+  let m;
+  while ((m = re.exec(src))) {
+    const attrs = m[1] || '';
+    const bodyFrom = m.index + m[0].length;
+    const close = src.indexOf(CLOSE, bodyFrom);
+    const external = /\bsrc\s*=/i.test(attrs);
+    if (close < 0) {
+      out.push({ tagFrom: m.index, bodyFrom, bodyTo: src.length, end: src.length, attrs, external, unclosed: true, type: typeOf(attrs) });
+      break;
+    }
+    out.push({ tagFrom: m.index, bodyFrom, bodyTo: close, end: close + CLOSE.length, attrs, external, unclosed: false, type: typeOf(attrs) });
+    re.lastIndex = close;
+  }
+  return out;
+}
+
+/**
+ * Is this offset inside a script body — the one place a block must never be written?
+ *
+ * ⚑ Inclusive at both ends. Writing at the very first character of a script body, or at the very
+ * last, is writing inside the script; an exclusive test calls those two positions safe and they are
+ * the two most likely places for an appender to aim at.
+ */
+function insideScript(html, offset) {
+  const at = Number(offset);
+  if (!Number.isFinite(at)) return null;
+  for (const s of scriptSpans(html)) {
+    if (at >= s.bodyFrom && at <= s.bodyTo) return s;
+  }
+  return null;
+}
+
+/**
+ * Where a block may safely go: after every script has closed, just before </body>.
+ *
+ * ⚑ Chosen from the document's STRUCTURE, never from a byte count. An offset is exactly what the old
+ * injector used, and an offset knows nothing about what it is landing in the middle of.
+ */
+function insertionPoint(html) {
+  const src = typeof html === 'string' ? html : '';
+  if (!src) return 0;
+
+  const spans = scriptSpans(src);
+  const lastEnd = spans.length ? Math.max(...spans.map(s => s.end)) : 0;
+
+  // Prefer just before </body>, but never before a script that has not closed yet.
+  const body = src.toLowerCase().lastIndexOf('</body>');
+  if (body >= 0 && body >= lastEnd) return body;
+  if (lastEnd > 0 && lastEnd <= src.length) return lastEnd;
+  return src.length;
+}
+
+/** The line ending the file actually uses. Writing the other one puts a raw newline in a string. */
+function newlineOf(html) {
+  return typeof html === 'string' && html.includes('\r\n') ? '\r\n' : '\n';
+}
+
+/**
+ * Every executable inline script compiles, cut the way a browser cuts it.
+ *
+ * `parse` is supplied by the caller — `code => new vm.Script(code)` under Node. Modules are skipped
+ * unless a module parser is given, because `import` is illegal in the ordinary one and compiling a
+ * healthy module that way reports a working page as broken.
+ */
+function pageParses(html, parse, parseModule) {
+  if (typeof parse !== 'function') throw new TypeError('graft needs a JavaScript parser passed in');
+  for (const s of scriptSpans(html)) {
+    if (s.unclosed) return { ok: false, reason: 'a <script> is never closed', at: s.tagFrom };
+    if (s.external) continue;
+    if (!EXECUTED.test(s.type)) continue;
+    const code = html.slice(s.bodyFrom, s.bodyTo);
+    if (!code.trim()) continue;
+    const isModule = /^module$/i.test(s.type);
+    if (isModule && typeof parseModule !== 'function') continue;
+    try { (isModule ? parseModule : parse)(code); }
+    catch (e) { return { ok: false, reason: e && e.message ? e.message : 'does not parse', at: s.bodyFrom }; }
+  }
+  return { ok: true, reason: 'every script parses', at: -1 };
+}
+
+/**
+ * ⚑ THE ONE SAFE WAY TO ADD A BLOCK.
+ *
+ * Refuses rather than damages: if the page would stop parsing, nothing is written and the caller is
+ * told why. `marker` makes it idempotent — a second run adds nothing.
+ */
+function graft(html, block, opts) {
+  const o = (opts && typeof opts === 'object') ? opts : {};
+  const src = typeof html === 'string' ? html : '';
+  const text = typeof block === 'string' ? block.replace(/^[\r\n]+|[\r\n]+$/g, '') : '';
+
+  if (!src) return { ok: false, reason: 'there is no page to graft onto', html: src, already: false };
+  if (!text) return { ok: false, reason: 'there is no block to graft', html: src, already: false };
+
+  const marker = typeof o.marker === 'string' && o.marker ? o.marker : text.split(/\r?\n/)[0];
+  if (marker && src.includes(marker)) {
+    return { ok: false, already: true, reason: 'this block is already on the page', html: src };
+  }
+
+  const before = pageParses(src, o.parse, o.parseModule);
+  const at = insertionPoint(src);
+  if (insideScript(src, at)) {
+    return { ok: false, already: false, reason: 'no safe place to put it — every candidate is inside a script', html: src };
+  }
+
+  const nl = newlineOf(src);
+  const out = src.slice(0, at) + nl + nl + text.replace(/\r?\n/g, nl) + nl + src.slice(at);
+
+  // ⚑ Never hand back a page that stops parsing because of this graft. A page that was ALREADY
+  // broken is not made the graft's fault — it is reported, and the graft still refuses, because
+  // grafting onto a broken page hides which fault is which.
+  const after = pageParses(out, o.parse, o.parseModule);
+  if (!after.ok) {
+    return {
+      ok: false, already: false, html: src,
+      reason: before.ok
+        ? `grafting would stop the page parsing (${after.reason}) — nothing was written`
+        : `the page was already broken before grafting (${before.reason}) — fix that first`,
+    };
+  }
+  return { ok: true, already: false, reason: 'grafted', html: out, at };
+}
+
+/**
+ * Blocks that are sitting inside a script body — pages the old injector cut.
+ *
+ * A block is recognised by its banner comment. More than one injector does this, so the caller passes
+ * the banners it knows about rather than this file assuming there is only ever one.
+ *
+ * ⚑ A BANNER INSIDE A SCRIPT IS NOT ENOUGH, and this page proved it. The page you are reading holds a
+ * worked example of a cut page in a JavaScript string, banner and all — and an earlier version of this
+ * function reported the tool itself as damaged. A comment sitting in a string is text; it does no
+ * harm. What does the harm is the injected `<script>` that follows the banner, because ITS closing tag
+ * becomes the host's, and that is what ends the host early. So a block counts as severing only when a
+ * script tag actually opens between the banner and the point where the host script now ends.
+ */
+function severedBlocks(html, banners) {
+  const src = typeof html === 'string' ? html : '';
+  const names = Array.isArray(banners) && banners.length ? banners : ['AUTOPILOT'];
+  const out = [];
+  const re = /<!--([^]*?)-->/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const body = m[1] || '';
+    if (!names.some(n => body.toUpperCase().includes(String(n).toUpperCase()))) continue;
+    const host = insideScript(src, m.index);
+    if (!host) continue;
+    const opensAScript = /<script[\s>]/i.test(src.slice(m.index, host.bodyTo));
+    if (!opensAScript) continue;
+    out.push({ at: m.index, hostFrom: host.bodyFrom, hostTo: host.bodyTo });
+  }
+  return out;
+}
+
+
+/* __END_GRAFT_KERNEL__ */
+
+var BANNERS = ['AUTOPILOT', 'niceassos-organs', 'L3 graft', 'fall-kit', 'fall-hot'];
+var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
+  return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+
+// The parser, supplied the way the kernel asks for one. In a browser that is new Function.
+var parse = function (code) { return new Function(code); };
+
+function report(html) {
+  var out = document.getElementById('out');
+  if (!html.trim()) { out.innerHTML = '<div class="verdict warn"><b>Nothing to check</b><span>Paste a page above.</span></div>'; return; }
+
+  var spans = scriptSpans(html);
+  var cut = severedBlocks(html, BANNERS);
+  var parsed = pageParses(html, parse);
+  var at = insertionPoint(html);
+  var unsafe = insideScript(html, at);
+
+  var v = '';
+  if (cut.length) {
+    v += '<div class="verdict cut"><b>Cut in half</b><span>' + cut.length +
+      ' block' + (cut.length === 1 ? ' is' : 's are') + ' sitting inside a script body. ' +
+      'Everything after that point stopped being code.</span></div>';
+  } else if (!parsed.ok) {
+    v += '<div class="verdict warn"><b>Broken, but not by an injector</b><span>' +
+      esc(parsed.reason) + ' — no injected block is inside a script, so this is a different fault.</span></div>';
+  } else {
+    v += '<div class="verdict safe"><b>Whole</b><span>Every script parses, and nothing is grafted ' +
+      'anywhere it could cut the page.</span></div>';
+  }
+
+  var rows = '';
+  spans.forEach(function (s, i) {
+    var kind = s.external ? 'external' : (s.type || 'classic');
+    rows += '<tr><td class="n">' + (i + 1) + '</td><td>' + esc(kind) + '</td><td class="n">' +
+      s.bodyFrom + '–' + s.bodyTo + '</td><td>' + (s.unclosed ? 'never closed' : 'closes') + '</td></tr>';
+  });
+
+  out.innerHTML = v +
+    '<div class="scroll"><table><thead><tr><th>#</th><th>kind</th><th>body bytes</th><th></th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>' +
+    '<p class="note" style="margin-top:10px">A new block would go at byte <b>' + at + '</b>' +
+    (unsafe ? ' — but that is <b>inside a script</b>, so grafting is refused on this page.' :
+              ', which is outside every script.') + '</p>';
+}
+
+var DEMO = [
+  '<!doctype html><html><body>',
+  '<h1>An app that looks fine</h1>',
+  '<' + 'script>',
+  'function report(x) {',
+  '  return `<!doctype html><html><body>',
+  '    <p>${x}</p>',
+  '<!-- AUTOPILOT · fall-autopilot-kit -->',
+  '<' + 'script type="module">console.log("injected")</' + 'script>',
+  '  </body></html>`;',
+  '}',
+  'function save() { localStorage.setItem("k", report(1)); }',
+  '</' + 'script>',
+  '</body></html>'
+].join('\n');
+
+document.getElementById('go').addEventListener('click', function () {
+  report(document.getElementById('src').value);
+});
+document.getElementById('demo').addEventListener('click', function () {
+  document.getElementById('src').value = DEMO;
+  report(DEMO);
+});
+document.getElementById('clear').addEventListener('click', function () {
+  document.getElementById('src').value = '';
+  document.getElementById('out').innerHTML = '';
+});
+</script>
+</body>
+</html>

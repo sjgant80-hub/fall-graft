@@ -1,0 +1,32 @@
+[
+  {
+    "line": 51,
+    "mutation": "< → <=",
+    "snippet": "if (close < 0) {",
+    "reason": "Equivalent. `close` is the result of indexOf for the closing tag, searched from `bodyFrom`. Because every span begins after an opening `<script...>` tag, bodyFrom is never smaller than 8, so indexOf can only return -1 or a value of at least 8. It can never return 0, which is the single value that separates `< 0` from `<= 0`. No page can be written that tells the two apart. That an unclosed script is detected at all, and that it leaves nowhere safe to graft, is asserted directly in section 7."
+  },
+  {
+    "line": 93,
+    "mutation": "<= → <",
+    "snippet": "if (lastEnd > 0 && lastEnd <= src.length) return lastEnd;",
+    "reason": "Equivalent. lastEnd is the end offset of the last script element, so it is at most the length of the document. The two versions differ only when lastEnd equals src.length exactly — a page whose final character is the last character of a closing script tag. In that case the original returns lastEnd and the mutant falls through to the next line, which returns src.length. Those are the same number, so the insertion point is identical and no test could distinguish them. That a page with no </body> appends after the last script is asserted in section 10."
+  },
+  {
+    "line": 92,
+    "mutation": "&& → ||",
+    "snippet": "if (body >= 0 && body >= lastEnd) return body;",
+    "reason": "Equivalent. When a </body> exists, `body >= 0` is true and both versions take the branch identically once the second test also holds, which section 12 pins with a script placed after </body>. When no </body> exists, body is -1: the original is false, and the mutant evaluates `-1 >= lastEnd`, where lastEnd is an offset and therefore never negative — so that is false too, and both fall through to the same next line. There is no document for which the two return different offsets."
+  },
+  {
+    "line": 120,
+    "mutation": "&& → ||",
+    "snippet": "catch (e) { return { ok: false, reason: e && e.message ? e.message : 'does not parse', at:",
+    "reason": "Equivalent. This picks the message off a caught parse error. A thrown SyntaxError is always a truthy object carrying a message, so both versions read e.message. For the only other possibility — a thrown null or undefined — the original short-circuits to the fallback text, and the mutant evaluates `e || e.message`, which is undefined and therefore falsy, so it reaches the same fallback. Both produce the identical reason string for every input. That a real parse failure is reported with its own message rather than a generic one is asserted in section 4."
+  },
+  {
+    "line": 132,
+    "mutation": "&& → ||",
+    "snippet": "const o = (opts && typeof opts === 'object') ? opts : {};",
+    "reason": "Equivalent. This normalises the options bag. The versions differ only for a value that is truthy but not an object — a string, a number, true, a function — which the original replaces with {} and the mutant keeps. Either way the next lines read o.marker, o.parse and o.parseModule off it, and none of those types carries any of those properties, so all three are undefined in both cases: the marker falls back to the banner line and the missing parser makes graft throw. That graft throws rather than skipping its check when no parser is supplied is asserted in section 9."
+  }
+]
