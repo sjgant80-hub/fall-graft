@@ -196,4 +196,49 @@ export function severedBlocks(html, banners) {
   return out;
 }
 
-export default { scriptSpans, insideScript, insertionPoint, newlineOf, pageParses, graft, severedBlocks };
+/**
+ * The whole injected run starting at `at` — every consecutive block, not just the first.
+ *
+ * ⚑ INJECTORS QUEUE UP BEHIND EACH OTHER. quine-cube-runner has three runs back to back: the
+ * autopilot banner and its module, then the organs banner with an external script, then an inline
+ * one. Removing only the first leaves the other two still sitting inside the host script, so the app
+ * stays just as dead — and worse, it now looks repaired.
+ *
+ * Returns the end offset of the last consecutive injected piece. What counts as injected is
+ * deliberately narrow: whitespace, a banner comment naming a known injector, and the script tags
+ * belonging to it. Anything else stops the walk, because deleting a line of somebody's app because it
+ * happened to sit nearby is a far worse bug than leaving one block behind.
+ */
+export function injectedRunAt(html, at, banners) {
+  const src = typeof html === 'string' ? html : '';
+  const names = Array.isArray(banners) && banners.length ? banners : ['AUTOPILOT'];
+  const isBanner = (text) => names.some(n => text.toUpperCase().includes(String(n).toUpperCase()));
+
+  let i = Number(at);
+  if (!Number.isFinite(i) || i < 0 || i >= src.length) return Number(at) || 0;
+  let end = i, sawSomething = false;
+
+  for (let guard = 0; guard < 64; guard++) {
+    const rest = src.slice(end);
+    const ws = /^\s*/.exec(rest)[0].length;
+    const after = rest.slice(ws);
+
+    const comment = /^<!--([^]*?)-->/.exec(after);
+    if (comment && isBanner(comment[1])) { end += ws + comment[0].length; sawSomething = true; continue; }
+
+    const external = /^<script[^>]*\bsrc\s*=[^>]*>\s*<\/script>/i.exec(after);
+    if (external && sawSomething) { end += ws + external[0].length; continue; }
+
+    const inline = /^<script(?![^>]*\bsrc\s*=)[^>]*>/i.exec(after);
+    if (inline && sawSomething) {
+      const close = src.indexOf(CLOSE, end + ws + inline[0].length);
+      if (close < 0) break;
+      end = close + CLOSE.length;
+      continue;
+    }
+    break;
+  }
+  return sawSomething ? end : i;
+}
+
+export default { scriptSpans, insideScript, insertionPoint, newlineOf, pageParses, graft, severedBlocks, injectedRunAt };

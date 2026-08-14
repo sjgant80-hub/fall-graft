@@ -28,5 +28,23 @@
     "mutation": "&& → ||",
     "snippet": "const o = (opts && typeof opts === 'object') ? opts : {};",
     "reason": "Equivalent. This normalises the options bag. The versions differ only for a value that is truthy but not an object — a string, a number, true, a function — which the original replaces with {} and the mutant keeps. Either way the next lines read o.marker, o.parse and o.parseModule off it, and none of those types carries any of those properties, so all three are undefined in both cases: the marker falls back to the banner line and the missing parser makes graft throw. That graft throws rather than skipping its check when no parser is supplied is asserted in section 9."
+  },
+  {
+    "line": 218,
+    "mutation": ">= → >",
+    "snippet": "if (!Number.isFinite(i) || i < 0 || i >= src.length) return Number(at) || 0;",
+    "reason": "Equivalent. This rejects a start position that is past the end of the document. The two versions differ only when the position equals the length exactly. The original returns it straight back; the mutant lets it through, and the walk then slices from the very end, which yields an empty string, matches none of the three patterns, and returns the same position because nothing was consumed. Both hand back the identical offset for every input. That a position past the end consumes nothing is asserted in section 13."
+  },
+  {
+    "line": 221,
+    "mutation": "< → <=",
+    "snippet": "for (let guard = 0; guard < 64; guard++) {",
+    "reason": "Equivalent in every reachable case. This is the runaway guard on the walk over consecutive injected blocks, and it only ever runs while blocks are still being consumed — the loop breaks the moment it meets anything it does not recognise. Sixty-four is far above any real run: the worst page found in the estate had three. One extra permitted iteration therefore changes nothing, because the loop has already broken long before. The guard exists so a malformed document cannot spin forever, and that property is unchanged either way."
+  },
+  {
+    "line": 235,
+    "mutation": "< → <=",
+    "snippet": "if (close < 0) break;",
+    "reason": "Equivalent, for the same reason as the identical test in scriptSpans. The close offset is the result of indexOf for a closing tag, searched from a position that is already past an opening script tag, so it can only be -1 or a value well above zero. It can never be exactly 0, which is the single value separating the two comparisons. No document can be written that tells them apart. That a run whose inline script never closes stops the walk rather than consuming the rest of the file is what this line protects, and that behaviour is identical in both versions."
   }
 ]

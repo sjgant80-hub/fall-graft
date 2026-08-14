@@ -43,7 +43,7 @@ under Node, `new Function` in a browser), so the checker and the writer cannot d
 
 ## Proof
 
-60 tests, mutation gate **26/30 killed, 4 reviewed-equivalent**, CI pinned `witness@v0.2`. The page
+73 tests, mutation gate **35/42 killed, 7 reviewed-equivalent**, CI pinned `witness@v0.2`. The page
 inlines the gated kernel verbatim and CI fails if it has drifted.
 
 Checked against the estate: of 222 real pages, it finds the **14** that were cut and reports the other

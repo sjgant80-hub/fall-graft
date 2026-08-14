@@ -9,7 +9,7 @@
 // reported. Nothing is ever written twice.
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { graft, severedBlocks, insideScript, insertionPoint, pageParses, scriptSpans, newlineOf } from './graft.mjs';
+import { graft, severedBlocks, insideScript, insertionPoint, pageParses, scriptSpans, newlineOf, injectedRunAt } from './graft.mjs';
 
 const parse = (code) => new vm.Script(code);
 const parseModule = typeof vm.SourceTextModule === 'function'
@@ -55,23 +55,16 @@ function repair(files) {
   let bad = 0;
   for (const f of files) {
     let html = readFileSync(f, 'utf8');
-    const nl = newlineOf(html);
-    const before = html;
-    let moved = 0;
+    let moved = 0, found = 0;
 
     for (let round = 0; round < 8; round++) {
       const cut = severedBlocks(html, BANNERS);
       if (!cut.length) break;
+      found++;
       const b = cut[0];
-      // the whole injected run: the banner comment through its closing tag, plus adjacent src tags
-      const commentEnd = html.indexOf('-->', b.at) + 3;
-      let end = html.indexOf(CLOSE, commentEnd);
-      end = end < 0 ? commentEnd : end + CLOSE.length;
-      for (;;) {
-        const next = /^\s*<script[^>]*\bsrc\s*=[^>]*>\s*<\/script>/i.exec(html.slice(end));
-        if (!next) break;
-        end += next[0].length;
-      }
+      // ⚑ The WHOLE run, not just the first block — injectedRunAt walks every consecutive one.
+      const end = injectedRunAt(html, b.at, BANNERS);
+      if (end <= b.at) break;
       const block = html.slice(b.at, end).replace(/^[\r\n]+|[\r\n]+$/g, '');
       const stripped = html.slice(0, b.at) + html.slice(end);
       const r = graft(stripped, block, { parse, parseModule, marker: block.slice(0, 40) });
@@ -86,10 +79,14 @@ function repair(files) {
     }
 
     const p = pageParses(html, parse, parseModule);
-    if (!moved) { console.log(`  – ${f} — nothing inside a script`); continue; }
-    if (!p.ok) { bad++; console.log(`  ✗ ${f} — ${moved} block(s) moved but it still does not parse (${p.reason}); left untouched`); continue; }
+    // ⚑ "Nothing inside a script" and "I found one and could not move it" are different sentences,
+    // and an earlier version printed the first when it meant the second. A tool that reports a
+    // failure as a clean bill of health is worse than one that crashes.
+    if (!moved && !found) { console.log(`  – ${f} — nothing inside a script`); continue; }
+    if (!moved) { bad++; console.log(`  ✗ ${f} — ${found} block(s) found inside a script but none could be moved; left untouched`); continue; }
+    if (!p.ok) { bad++; console.log(`  ✗ ${f} — ${moved} run(s) moved but it still does not parse (${p.reason}); left untouched`); continue; }
     writeFileSync(f, html);
-    console.log(`  ✓ ${f} — ${moved} block(s) moved out, page parses${before.length !== html.length ? '' : ''}`);
+    console.log(`  ✓ ${f} — ${moved} injected run(s) moved out, page parses`);
   }
   return bad;
 }

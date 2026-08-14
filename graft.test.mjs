@@ -1,6 +1,6 @@
 // graft.test.mjs — PROOF-OF-PLAY for the thing that cut fourteen live apps in half.
 import vm from 'node:vm';
-import { scriptSpans, insideScript, insertionPoint, newlineOf, pageParses, graft, severedBlocks } from './graft.mjs';
+import { scriptSpans, insideScript, insertionPoint, newlineOf, pageParses, graft, severedBlocks, injectedRunAt } from './graft.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? '  ✓ ' : '  ✗ FAIL ') + m); };
@@ -214,6 +214,58 @@ console.log('\n=== §12 · the two ends of a script body ===');
   const at = insertionPoint(odd);
   ok(at >= odd.indexOf(SE), '⚑ a script sitting after </body> still gets grafted AFTER, never before it');
   ok(insideScript(odd, at) === null, 'and the point is outside it');
+}
+
+console.log('\n=== §13 · ⚑ INJECTORS QUEUE UP BEHIND EACH OTHER ===');
+{
+  // quine-cube-runner's real shape: three runs back to back inside one host script.
+  const RUN = [
+    `<!-- AUTOPILOT · fall-autopilot-kit -->`,
+    `${S}type="module">console.log(1)${SE}`.replace('<script', '<script '),
+    ``,
+    `<!-- niceassos-organs · L3 graft -->`,
+    `<script src="https://example.com/organ.js"></` + `script>`,
+    `${S}installOrgan({})${SE}`,
+  ].join('\n');
+  const host = `${S}\nconst T = {\n  html: \`<!doctype html><body>x\n${RUN}\n</body>\`,\n  more: 1\n};\n${SE}`;
+
+  const at = host.indexOf('<!-- AUTOPILOT');
+  const end = injectedRunAt(host, at, ['AUTOPILOT', 'niceassos-organs', 'L3 graft']);
+  const removed = host.slice(at, end);
+  ok(removed.includes('AUTOPILOT') && removed.includes('niceassos-organs'),
+     '⚑ ALL THREE runs come out together — removing only the first leaves the app just as dead, and looking repaired');
+  ok(removed.includes('installOrgan'), 'including the inline script the second injector added');
+  ok(!removed.includes('</body>`'), 'and it stops at the app\'s own next line, which is not injected');
+
+  const rejoined = host.slice(0, at).replace(/\s*$/, '') + host.slice(end).replace(/^\s*/, '');
+  ok(pageParses(rejoined, parse).ok === true, 'so once the run is gone the template literal closes and the page parses');
+
+  // narrowness: it must not eat things that merely sit nearby
+  const nearby = `<!-- AUTOPILOT -->\n${S}console.log(1)${SE}\n<div>the app's own markup</div>`;
+  const e2 = injectedRunAt(nearby, 0, ['AUTOPILOT']);
+  ok(!nearby.slice(0, e2).includes('<div>'),
+     '⚑ it stops at anything it does not recognise — deleting a line of somebody\'s app because it sat nearby is a far worse bug than leaving a block behind');
+  ok(injectedRunAt(nearby, nearby.indexOf('<div>'), ['AUTOPILOT']) === nearby.indexOf('<div>'),
+     'starting somewhere that is not a banner consumes nothing');
+
+  // ⚑ A run at the very start of the file is a real run. Treating offset 0 as "no position" would
+  // silently skip a page whose first byte is the injected block.
+  ok(e2 > 0, '⚑ a run beginning at offset ZERO is consumed, not dismissed as a missing position');
+  ok(nearby.slice(0, e2).includes('console.log(1)'), 'and it takes the whole block with it');
+
+  // Positions that are not positions must be handed straight back, never used to slice with.
+  ok(injectedRunAt(nearby, NaN, ['AUTOPILOT']) === 0, 'a position that is not a number consumes nothing');
+  ok(injectedRunAt(nearby, -5, ['AUTOPILOT']) === -5, 'and neither does a negative one');
+
+  // ⚑ A NEGATIVE POSITION MUST NOT BE USED TO INDEX FROM THE END. slice(-5) silently means "the last
+  // five characters" in JavaScript, so a guard that lets a negative through does not fail — it
+  // quietly starts the walk somewhere near the end of the file and deletes whatever it finds there.
+  const endsWithBlock = `<div>the app</div>\n<!-- AUTOPILOT -->\n${S}console.log(1)${SE}`;
+  const tail = -(endsWithBlock.length - endsWithBlock.indexOf('<!-- AUTOPILOT'));
+  ok(injectedRunAt(endsWithBlock, tail, ['AUTOPILOT']) === tail,
+     '⚑ a negative position is handed straight back even when counting from the end would land exactly on a real block');
+  ok(injectedRunAt(nearby, nearby.length + 99, ['AUTOPILOT']) === nearby.length + 99, 'nor one past the end');
+  ok(injectedRunAt('', 0, ['AUTOPILOT']) === 0 && injectedRunAt(null, 5, null) === 5, 'and garbage consumes nothing');
 }
 
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed\n`);
